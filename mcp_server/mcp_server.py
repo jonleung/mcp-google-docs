@@ -1,16 +1,27 @@
+# File: mcp_server/mcp_server.py
+
+import os
+import argparse
+import asyncio
+import dotenv
+
+# Import MCP server utilities
 from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
 import mcp.types as types
 import mcp.server.stdio
-import dotenv
 
-from google_docs_service import GoogleDocsService
+# Import your service implementation
+from mcp_server.google_docs_service import GoogleDocsService
 
 dotenv.load_dotenv()
 
-async def main(creds_file_path: str, token_path: str):
+async def run_main(creds_file_path: str, token_path: str):
+    # Convert relative paths to absolute paths.
     creds_file_path = os.path.abspath(creds_file_path)
     token_path = os.path.abspath(token_path)
+
+    # Instantiate the service.
     docs_service = GoogleDocsService(creds_file_path, token_path)
     server = Server("googledocs")
 
@@ -23,7 +34,11 @@ async def main(creds_file_path: str, token_path: str):
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "title": {"type": "string", "description": "Title of the new document", "default": "New Document"}
+                        "title": {
+                            "type": "string",
+                            "description": "Title of the new document",
+                            "default": "New Document"
+                        }
                     },
                     "required": []
                 }
@@ -82,7 +97,10 @@ async def main(creds_file_path: str, token_path: str):
         if name == "create-doc":
             title = arguments.get("title", "New Document")
             doc = await docs_service.create_document(title)
-            return [types.TextContent(type="text", text=f"Document created at url: https://docs.google.com/document/d/{doc.get('documentId')}/edit")]
+            return [types.TextContent(
+                type="text",
+                text=f"Document created at URL: https://docs.google.com/document/d/{doc.get('documentId')}/edit"
+            )]
         elif name == "edit-doc":
             document_id = arguments["document_id"]
             requests_payload = arguments["requests"]
@@ -113,20 +131,19 @@ async def main(creds_file_path: str, token_path: str):
                 server_name="googledocs",
                 server_version="0.1.0",
                 capabilities=server.get_capabilities(
-                    notification_options=NotificationOptions(), experimental_capabilities={}
+                    notification_options=NotificationOptions(),
+                    experimental_capabilities={}
                 ),
             ),
         )
 
-if __name__ == "__main__":
-    import os
-    import argparse
-    import asyncio
-
-    print(os.getcwd())
+def main():
+    """
+    Entry point for the MCP server. This function parses command-line arguments
+    (or falls back to environment variables) for the credentials and token file paths,
+    then calls the async run_main() function.
+    """
     parser = argparse.ArgumentParser(description='Google Docs API MCP Server')
-
-    # Use environment variables as defaults if available.
     parser.add_argument(
         '--creds-file-path',
         required=False,
@@ -140,10 +157,9 @@ if __name__ == "__main__":
         help='File path to store/retrieve tokens (or set GOOGLE_TOKEN_FILE env variable)'
     )
     args = parser.parse_args()
-
     if not args.creds_file_path or not args.token_path:
-        parser.error(
-            "You must supply --creds-file-path and --token-path, or set GOOGLE_CREDS_FILE and GOOGLE_TOKEN_FILE environment variables."
-        )
+        parser.error("You must supply --creds-file-path and --token-path, or set GOOGLE_CREDS_FILE and GOOGLE_TOKEN_FILE environment variables.")
+    asyncio.run(run_main(args.creds_file_path, args.token_path))
 
-    asyncio.run(main(args.creds_file_path, args.token_path))
+if __name__ == "__main__":
+    main()

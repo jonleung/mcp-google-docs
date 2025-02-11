@@ -18,3 +18,9 @@ dev = [
     "pytest-asyncio>=0.25.3",
     "pytest>=8.3.4",
 ]
+
+[tool]
+uv.package = true
+
+[project.scripts]
+server = "mcp_server.mcp_server:main"

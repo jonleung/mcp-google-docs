@@ -65,9 +65,10 @@ class GoogleDocsService:
     async def read_comments(self, document_id: str) -> list:
         """Reads comments on the document using the Drive API."""
         def _list_comments():
+            # Request only supported fields (replyCount removed).
             return self.drive_service.comments().list(
                 fileId=document_id,
-                fields="comments(id,content,author,createdTime,modifiedTime,replyCount)"
+                fields="comments(id,content,author,createdTime,modifiedTime)"
             ).execute()
         response = await asyncio.to_thread(_list_comments)
         comments = response.get('comments', [])
@@ -78,8 +79,12 @@ class GoogleDocsService:
         """Replies to a specific comment on a document using the Drive API."""
         def _reply():
             body = {'content': reply_content}
+            # Provide the required fields parameter.
             return self.drive_service.replies().create(
-                fileId=document_id, commentId=comment_id, body=body
+                fileId=document_id,
+                commentId=comment_id,
+                body=body,
+                fields="id,content,author,createdTime,modifiedTime"
             ).execute()
         reply = await asyncio.to_thread(_reply)
         logger.info(f"Posted reply to comment {comment_id} in document {document_id}")
@@ -113,4 +118,3 @@ class GoogleDocsService:
         """Convenience method to get the document text."""
         doc = await self.read_document(document_id)
         return self.extract_text(doc)
-

@@ -43,20 +43,52 @@ async def run_main(creds_file_path: str, token_path: str):
                     "required": []
                 }
             ),
+
             types.Tool(
                 name="edit-doc",
                 description="Edits a Google Doc using batchUpdate requests",
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "document_id": {"type": "string", "description": "ID of the document"},
+                        "document_id": {
+                            "type": "string",
+                            "description": "The ID of the Google Document to be edited."
+                        },
                         "requests": {
                             "type": "array",
-                            "description": "List of update requests",
+                            "description": "An array containing a single replaceAllText request.",
                             "items": {
                                 "type": "object",
-                                "description": "A batch update request for Google Docs"
-                            }
+                                "properties": {
+                                    "replaceAllText": {
+                                        "type": "object",
+                                        "properties": {
+                                            "containsText": {
+                                                "type": "object",
+                                                "properties": {
+                                                    "text": {
+                                                        "type": "string",
+                                                        "description": "The text to be replaced. This can include special characters or patterns."
+                                                    },
+                                                    "matchCase": {
+                                                        "type": "boolean",
+                                                        "description": "Indicates whether the search should be case-sensitive."
+                                                    }
+                                                },
+                                                "required": ["text"]
+                                            },
+                                            "replaceText": {
+                                                "type": "string",
+                                                "description": "The text that will replace all instances of the matched text."
+                                            }
+                                        },
+                                        "required": ["containsText", "replaceText"]
+                                    }
+                                },
+                                "required": ["replaceAllText"]
+                            },
+                            "minItems": 1,
+                            "maxItems": 1
                         }
                     },
                     "required": ["document_id", "requests"]

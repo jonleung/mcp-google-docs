@@ -50,7 +50,14 @@ async def run_main(creds_file_path: str, token_path: str):
                     "type": "object",
                     "properties": {
                         "document_id": {"type": "string", "description": "ID of the document"},
-                        "requests": {"type": "array", "description": "List of update requests"}
+                        "requests": {
+                            "type": "array",
+                            "description": "List of update requests",
+                            "items": {
+                                "type": "object",
+                                "description": "A batch update request for Google Docs"
+                            }
+                        }
                     },
                     "required": ["document_id", "requests"]
                 }

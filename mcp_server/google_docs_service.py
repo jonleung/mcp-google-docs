@@ -68,7 +68,7 @@ class GoogleDocsService:
             # Request only supported fields (replyCount removed).
             return self.drive_service.comments().list(
                 fileId=document_id,
-                fields="comments(id,anchor,content,author,createdTime,modifiedTime)"
+                fields="comments(id,content,author,createdTime,modifiedTime)"
             ).execute()
         response = await asyncio.to_thread(_list_comments)
         comments = response.get('comments', [])
@@ -118,3 +118,18 @@ class GoogleDocsService:
         """Convenience method to get the document text."""
         doc = await self.read_document(document_id)
         return self.extract_text(doc)
+
+    async def create_comment(self, document_id: str, content: str) -> dict:
+        """
+        Creates a comment on the document.
+        """
+        def _create_comment():
+            body = {"content": content}
+            return self.drive_service.comments().create(
+                fileId=document_id,
+                body=body,
+                fields="id,content,author,createdTime,modifiedTime"
+            ).execute()
+        comment = await asyncio.to_thread(_create_comment)
+        logger.info(f"Created comment with ID: {comment.get('id')}")
+        return comment

@@ -286,25 +286,7 @@ async def run_main(creds_file_path: str, token_path: str):
             start_offset = arguments["start_offset"]
             length = arguments["length"]
             total_length = arguments.get("total_length", length)
-            # Retrieve the document to get the current revision id.
-            doc = await docs_service.read_document(document_id)
-            revision_id = doc.get("revisionId")
-            if not revision_id:
-                raise ValueError("Document revision ID not found.")
-            anchor_value = (
-                f"{{'r': '{revision_id}', 'a': [{{'txt': {{'o': {start_offset}, 'l': {length}, 'ml': {total_length}}}}}]}}"
-            )
-            def _create_comment():
-                body = {
-                    "content": content,
-                    "anchor": anchor_value
-                }
-                return docs_service.drive_service.comments().create(
-                    fileId=document_id,
-                    body=body,
-                    fields="id,content,author,createdTime,modifiedTime"
-                ).execute()
-            comment = await asyncio.to_thread(_create_comment)
+            comment = await docs_service.create_comment(document_id, content, start_offset, length, total_length)
             return [types.TextContent(type="text", text=f"Comment created: {comment}")]
         else:
             raise ValueError(f"Unknown tool: {name}")

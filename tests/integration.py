@@ -141,3 +141,13 @@ async def test_reply_comment(temp_document, docs_service):
             commentId=comment_id
         ).execute()
     await asyncio.to_thread(delete_comment)
+
+
+@pytest.mark.asyncio
+async def test_create_comment(temp_document, docs_service):
+    document_id = temp_document
+    start_offset = 1
+    length = 1
+    content = "Test create comment"
+    comment = await docs_service.create_comment(document_id, content)
+    assert "id" in comment, "Comment should have an id"

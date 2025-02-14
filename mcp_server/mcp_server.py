@@ -28,6 +28,7 @@ async def run_main(creds_file_path: str, token_path: str):
     @server.list_tools()
     async def handle_list_tools() -> list[types.Tool]:
         return [
+            # Tool: create-doc remains unchanged.
             types.Tool(
                 name="create-doc",
                 description="Creates a new Google Doc with an optional title",
@@ -37,61 +38,95 @@ async def run_main(creds_file_path: str, token_path: str):
                         "title": {
                             "type": "string",
                             "description": "Title of the new document",
-                            "default": "New Document"
+                            "default": "New Document",
+                            "example": "My New Document"
                         }
                     },
                     "required": []
                 }
             ),
-
+            # New tool: insert-text
             types.Tool(
-                name="edit-doc",
-                description="Edits a Google Doc using batchUpdate requests",
+                name="insert-text",
+                description="Inserts text into a Google Doc at a specified index",
                 inputSchema={
                     "type": "object",
                     "properties": {
                         "document_id": {
                             "type": "string",
-                            "description": "The ID of the Google Document to be edited."
+                            "description": "The ID of the Google Document",
+                            "example": "1abcXYZ..."
                         },
-                        "requests": {
-                            "type": "array",
-                            "description": "An array containing a single replaceAllText request.",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "replaceAllText": {
-                                        "type": "object",
-                                        "properties": {
-                                            "containsText": {
-                                                "type": "object",
-                                                "properties": {
-                                                    "text": {
-                                                        "type": "string",
-                                                        "description": "The text to be replaced. This can include special characters or patterns."
-                                                    },
-                                                    "matchCase": {
-                                                        "type": "boolean",
-                                                        "description": "Indicates whether the search should be case-sensitive."
-                                                    }
-                                                },
-                                                "required": ["text"]
-                                            },
-                                            "replaceText": {
-                                                "type": "string",
-                                                "description": "The text that will replace all instances of the matched text."
-                                            }
-                                        },
-                                        "required": ["containsText", "replaceText"]
-                                    }
-                                },
-                                "required": ["replaceAllText"]
-                            },
-                            "minItems": 1,
-                            "maxItems": 1
+                        "index": {
+                            "type": "number",
+                            "description": "The insertion index (1-based)",
+                            "example": 1
+                        },
+                        "text": {
+                            "type": "string",
+                            "description": "The text to insert",
+                            "example": "Hello World\n"
                         }
                     },
-                    "required": ["document_id", "requests"]
+                    "required": ["document_id", "index", "text"]
+                }
+            ),
+            # New tool: replace-text
+            types.Tool(
+                name="replace-text",
+                description="Replaces all occurrences of a search string with a replacement string in a Google Doc",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "document_id": {
+                            "type": "string",
+                            "description": "The ID of the Google Document",
+                            "example": "1abcXYZ..."
+                        },
+                        "search_text": {
+                            "type": "string",
+                            "description": "The text to search for",
+                            "example": "FOO"
+                        },
+                        "replace_text": {
+                            "type": "string",
+                            "description": "The text to replace with",
+                            "example": "BAR"
+                        },
+                        "match_case": {
+                            "type": "boolean",
+                            "description": "Whether the search should be case sensitive",
+                            "default": False,
+                            "example": False
+                        }
+                    },
+                    "required": ["document_id", "search_text", "replace_text"]
+                }
+            ),
+            # New tool: delete-content
+            types.Tool(
+                name="delete-content",
+                description="Deletes the content in a specified range in a Google Doc",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "document_id": {
+                            "type": "string",
+                            "description": "The ID of the Google Document",
+                            "example": "1abcXYZ..."
+                        },
+                        "start_index": {
+                            "type": "number",
+                            "description": "The starting index of the content range (inclusive)",
+                            "example": 10
+                        },
+                        "end_index": {
+                            "type": "number",
+                            "description": "The ending index of the content range (exclusive)",
+                            "example": 20
+                        }
+                    },
+                    "required": ["document_id", "start_index", "end_index"]
                 }
             ),
             types.Tool(
@@ -100,7 +135,11 @@ async def run_main(creds_file_path: str, token_path: str):
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "document_id": {"type": "string", "description": "ID of the document"}
+                        "document_id": {
+                            "type": "string",
+                            "description": "ID of the document",
+                            "example": "1abcXYZ..."
+                        }
                     },
                     "required": ["document_id"]
                 }
@@ -111,9 +150,21 @@ async def run_main(creds_file_path: str, token_path: str):
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "document_id": {"type": "string", "description": "ID of the document"},
-                        "comment_id": {"type": "string", "description": "ID of the comment"},
-                        "reply": {"type": "string", "description": "Content of the reply"}
+                        "document_id": {
+                            "type": "string",
+                            "description": "ID of the document",
+                            "example": "1abcXYZ..."
+                        },
+                        "comment_id": {
+                            "type": "string",
+                            "description": "ID of the comment",
+                            "example": "Cp1..."
+                        },
+                        "reply": {
+                            "type": "string",
+                            "description": "Content of the reply",
+                            "example": "Thanks for the feedback!"
+                        }
                     },
                     "required": ["document_id", "comment_id", "reply"]
                 }
@@ -124,9 +175,52 @@ async def run_main(creds_file_path: str, token_path: str):
                 inputSchema={
                     "type": "object",
                     "properties": {
-                        "document_id": {"type": "string", "description": "ID of the document"}
+                        "document_id": {
+                            "type": "string",
+                            "description": "ID of the document",
+                            "example": "1abcXYZ..."
+                        }
                     },
                     "required": ["document_id"]
+                }
+            ),
+            types.Tool(
+                name="create-comment",
+                description="Creates a new anchored comment on a Google Doc. "
+                            "You must specify the document ID, comment content, "
+                            "starting offset, and length. Optionally, provide the total "
+                            "number of characters (ml) in the target region.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "document_id": {
+                            "type": "string",
+                            "description": "ID of the document",
+                            "example": "1abcXYZ..."
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "The text content of the comment",
+                            "example": "This is an anchored comment."
+                        },
+                        "start_offset": {
+                            "type": "number",
+                            "description": "Starting offset in the document text",
+                            "example": 10
+                        },
+                        "length": {
+                            "type": "number",
+                            "description": "Length of the text range for the anchor",
+                            "example": 5
+                        },
+                        "total_length": {
+                            "type": "number",
+                            "description": "Total characters in the target region (ml)",
+                            "default": 5,
+                            "example": 5
+                        }
+                    },
+                    "required": ["document_id", "content", "start_offset", "length"]
                 }
             ),
         ]
@@ -140,11 +234,38 @@ async def run_main(creds_file_path: str, token_path: str):
                 type="text",
                 text=f"Document created at URL: https://docs.google.com/document/d/{doc.get('documentId')}/edit"
             )]
-        elif name == "edit-doc":
+        elif name == "insert-text":
             document_id = arguments["document_id"]
-            requests_payload = arguments["requests"]
-            result = await docs_service.edit_document(document_id, requests_payload)
-            return [types.TextContent(type="text", text=f"Document updated: {result}")]
+            index = arguments["index"]
+            text_to_insert = arguments["text"]
+            # Build an insertText request.
+            request = [{"insertText": {"location": {"index": index}, "text": text_to_insert}}]
+            result = await docs_service.edit_document(document_id, request)
+            return [types.TextContent(type="text", text=f"Inserted text into document {document_id}.")]
+        elif name == "replace-text":
+            document_id = arguments["document_id"]
+            search_text = arguments["search_text"]
+            replace_text = arguments["replace_text"]
+            match_case = arguments.get("match_case", False)
+            request = [{
+                "replaceAllText": {
+                    "containsText": {"text": search_text, "matchCase": match_case},
+                    "replaceText": replace_text
+                }
+            }]
+            result = await docs_service.edit_document(document_id, request)
+            return [types.TextContent(type="text", text=f"Replaced text in document {document_id}: {result}")]
+        elif name == "delete-content":
+            document_id = arguments["document_id"]
+            start_index = arguments["start_index"]
+            end_index = arguments["end_index"]
+            request = [{
+                "deleteContentRange": {
+                    "range": {"startIndex": start_index, "endIndex": end_index}
+                }
+            }]
+            result = await docs_service.edit_document(document_id, request)
+            return [types.TextContent(type="text", text=f"Deleted content from document {document_id}: {result}")]
         elif name == "read-comments":
             document_id = arguments["document_id"]
             comments = await docs_service.read_comments(document_id)
@@ -159,6 +280,32 @@ async def run_main(creds_file_path: str, token_path: str):
             document_id = arguments["document_id"]
             text = await docs_service.read_document_text(document_id)
             return [types.TextContent(type="text", text=text)]
+        elif name == "create-comment":
+            document_id = arguments["document_id"]
+            content = arguments["content"]
+            start_offset = arguments["start_offset"]
+            length = arguments["length"]
+            total_length = arguments.get("total_length", length)
+            # Retrieve the document to get the current revision id.
+            doc = await docs_service.read_document(document_id)
+            revision_id = doc.get("revisionId")
+            if not revision_id:
+                raise ValueError("Document revision ID not found.")
+            anchor_value = (
+                f"{{'r': '{revision_id}', 'a': [{{'txt': {{'o': {start_offset}, 'l': {length}, 'ml': {total_length}}}}}]}}"
+            )
+            def _create_comment():
+                body = {
+                    "content": content,
+                    "anchor": anchor_value
+                }
+                return docs_service.drive_service.comments().create(
+                    fileId=document_id,
+                    body=body,
+                    fields="id,content,author,createdTime,modifiedTime"
+                ).execute()
+            comment = await asyncio.to_thread(_create_comment)
+            return [types.TextContent(type="text", text=f"Comment created: {comment}")]
         else:
             raise ValueError(f"Unknown tool: {name}")
 
@@ -184,15 +331,17 @@ def main():
     """
     parser = argparse.ArgumentParser(description='Google Docs API MCP Server')
     parser.add_argument(
-        '--creds-file-path',
+        '--creds-file-path', '--creds_file_path',
         required=False,
         default=os.environ.get("GOOGLE_CREDS_FILE"),
+        dest="creds_file_path",
         help='OAuth 2.0 credentials file path (or set GOOGLE_CREDS_FILE env variable)'
     )
     parser.add_argument(
-        '--token-path',
+        '--token-path', '--token_path',
         required=False,
         default=os.environ.get("GOOGLE_TOKEN_FILE"),
+        dest="token_path",
         help='File path to store/retrieve tokens (or set GOOGLE_TOKEN_FILE env variable)'
     )
     args = parser.parse_args()

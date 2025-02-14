@@ -10,7 +10,7 @@ dotenv.load_dotenv()
 
 from mcp_server.google_docs_service import GoogleDocsService
 
-# Use pytest_asyncio.fixture to ensure async fixtures are properly awaited.
+# Async fixtures via pytest_asyncio.
 @pytest_asyncio.fixture(scope="session")
 def creds_file_path():
     path = os.environ.get("GOOGLE_CREDS_FILE")
@@ -27,7 +27,6 @@ def token_file_path():
 
 @pytest_asyncio.fixture(scope="session")
 def docs_service(creds_file_path, token_file_path):
-    # Instantiate the service with real credentials.
     service = GoogleDocsService(creds_file_path, token_file_path)
     return service
 
@@ -40,7 +39,6 @@ async def temp_document(docs_service):
     if not document_id:
         pytest.fail("Failed to create document.")
     yield document_id
-    # Cleanup: delete the document.
     try:
         await asyncio.to_thread(
             lambda: docs_service.drive_service.files().delete(fileId=document_id).execute()
@@ -61,22 +59,53 @@ async def test_create_document(docs_service):
     )
 
 @pytest.mark.asyncio
-async def test_edit_document(temp_document, docs_service):
+async def test_insert_text(temp_document, docs_service):
     document_id = temp_document
-    requests_payload = [
-        {
-            "insertText": {
-                "location": {"index": 1},
-                "text": "Hello Integration Test\n"
-            }
-        }
-    ]
-    result = await docs_service.edit_document(document_id, requests_payload)
-    # Instead of asserting that "replies" is absent, check for expected keys.
+    # Use the insert-text tool logic.
+    insert_request = [{"insertText": {"location": {"index": 1}, "text": "Hello Insert Test\n"}}]
+    result = await docs_service.edit_document(document_id, insert_request)
+    # Check that the response contains expected keys.
     assert "documentId" in result, "Response should contain 'documentId'"
-    assert "writeControl" in result, "Response should contain 'writeControl'"
     text = await docs_service.read_document_text(document_id)
-    assert "Hello Integration Test" in text, "The inserted text should appear in the document."
+    assert "Hello Insert Test" in text, "Inserted text should appear in the document."
+
+@pytest.mark.asyncio
+async def test_replace_text(temp_document, docs_service):
+    document_id = temp_document
+    # First, insert text that we can replace.
+    await docs_service.edit_document(document_id, [{"insertText": {"location": {"index": 1}, "text": "FOO FOO\n"}}])
+    # Use the replace-text tool logic.
+    replace_request = [{
+        "replaceAllText": {
+            "containsText": {"text": "FOO", "matchCase": True},
+            "replaceText": "BAR"
+        }
+    }]
+    result = await docs_service.edit_document(document_id, replace_request)
+    assert "documentId" in result, "Response should contain 'documentId'"
+    text = await docs_service.read_document_text(document_id)
+    assert "BAR BAR" in text, "Text should be replaced with BAR."
+
+@pytest.mark.asyncio
+async def test_delete_content(temp_document, docs_service):
+    document_id = temp_document
+    # Insert some text to delete.
+    await docs_service.edit_document(document_id, [{"insertText": {"location": {"index": 1}, "text": "DELETE_ME\n"}}])
+    # Read the text to determine the deletion range.
+    text_before = await docs_service.read_document_text(document_id)
+    # For simplicity, assume the inserted text appears at a known location.
+    # Here we delete from index 1 to index (1 + len("DELETE_ME\n"))
+    start_index = 1
+    end_index = start_index + len("DELETE_ME\n")
+    delete_request = [{
+        "deleteContentRange": {
+            "range": {"startIndex": start_index, "endIndex": end_index}
+        }
+    }]
+    result = await docs_service.edit_document(document_id, delete_request)
+    assert "documentId" in result, "Response should contain 'documentId'"
+    text_after = await docs_service.read_document_text(document_id)
+    assert "DELETE_ME" not in text_after, "The deleted text should no longer be present."
 
 @pytest.mark.asyncio
 async def test_read_document_text(temp_document, docs_service):

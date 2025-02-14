@@ -68,7 +68,7 @@ class GoogleDocsService:
             # Request only supported fields (replyCount removed).
             return self.drive_service.comments().list(
                 fileId=document_id,
-                fields="comments(id,content,author,createdTime,modifiedTime)"
+                fields="comments(id,anchor,content,author,createdTime,modifiedTime)"
             ).execute()
         response = await asyncio.to_thread(_list_comments)
         comments = response.get('comments', [])

@@ -265,7 +265,7 @@ wheels = [
 
 [[package]]
 name = "mcp-google-docs"
-version = "0.1.1"
+version = "0.2.2"
 source = { editable = "." }
 dependencies = [
     { name = "google-api-python-client" },

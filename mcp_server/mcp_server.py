@@ -187,9 +187,7 @@ async def run_main(creds_file_path: str, token_path: str):
             types.Tool(
                 name="create-comment",
                 description="Creates a new anchored comment on a Google Doc. "
-                            "You must specify the document ID, comment content, "
-                            "starting offset, and length. Optionally, provide the total "
-                            "number of characters (ml) in the target region.",
+                            "You must specify the document ID and the comment content.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -203,24 +201,8 @@ async def run_main(creds_file_path: str, token_path: str):
                             "description": "The text content of the comment",
                             "example": "This is an anchored comment."
                         },
-                        "start_offset": {
-                            "type": "number",
-                            "description": "Starting offset in the document text",
-                            "example": 10
-                        },
-                        "length": {
-                            "type": "number",
-                            "description": "Length of the text range for the anchor",
-                            "example": 5
-                        },
-                        "total_length": {
-                            "type": "number",
-                            "description": "Total characters in the target region (ml)",
-                            "default": 5,
-                            "example": 5
-                        }
                     },
-                    "required": ["document_id", "content", "start_offset", "length"]
+                    "required": ["document_id", "content"]
                 }
             ),
         ]
@@ -283,10 +265,7 @@ async def run_main(creds_file_path: str, token_path: str):
         elif name == "create-comment":
             document_id = arguments["document_id"]
             content = arguments["content"]
-            start_offset = arguments["start_offset"]
-            length = arguments["length"]
-            total_length = arguments.get("total_length", length)
-            comment = await docs_service.create_comment(document_id, content, start_offset, length, total_length)
+            comment = await docs_service.create_comment(document_id, content)
             return [types.TextContent(type="text", text=f"Comment created: {comment}")]
         else:
             raise ValueError(f"Unknown tool: {name}")

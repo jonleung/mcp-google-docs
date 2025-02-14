@@ -1,6 +1,6 @@
 [project]
 name = "mcp-google-docs"
-version = "0.2.4"
+version = "0.2.5"
 description = "mcp server for viewing, editing, creating, google docs (supports comments)"
 readme = "README.md"
 requires-python = ">=3.13"

@@ -11,9 +11,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class GoogleDocsService:
-    def __init__(self, creds_file_path: str, token_path: str,
-                 scopes: list[str] = None):
-        # Include both Docs and Drive scopes.
+    def __init__(self, creds_file_path: str, token_path: str, scopes: list[str] = None):
+        # Default scopes include both Docs and Drive.
         if scopes is None:
             scopes = [
                 'https://www.googleapis.com/auth/documents',
@@ -22,7 +21,7 @@ class GoogleDocsService:
         self.creds = self._get_credentials(creds_file_path, token_path, scopes)
         # Initialize the Docs API client.
         self.docs_service = build('docs', 'v1', credentials=self.creds)
-        # Initialize the Drive API client (for comments operations).
+        # Initialize the Drive API client (for comments and replies).
         self.drive_service = build('drive', 'v3', credentials=self.creds)
         logger.info("Google Docs and Drive services initialized.")
 
@@ -62,34 +61,6 @@ class GoogleDocsService:
         logger.info(f"Updated document {document_id}: {result}")
         return result
 
-    async def read_comments(self, document_id: str) -> list:
-        """Reads comments on the document using the Drive API."""
-        def _list_comments():
-            # Request only supported fields (replyCount removed).
-            return self.drive_service.comments().list(
-                fileId=document_id,
-                fields="comments(id,content,author,createdTime,modifiedTime,replies(content,author,id,createdTime,modifiedTime))"
-            ).execute()
-        response = await asyncio.to_thread(_list_comments)
-        comments = response.get('comments', [])
-        logger.info(f"Retrieved {len(comments)} comments for document {document_id}")
-        return comments
-
-    async def reply_comment(self, document_id: str, comment_id: str, reply_content: str) -> dict:
-        """Replies to a specific comment on a document using the Drive API."""
-        def _reply():
-            body = {'content': reply_content}
-            # Provide the required fields parameter.
-            return self.drive_service.replies().create(
-                fileId=document_id,
-                commentId=comment_id,
-                body=body,
-                fields="id,content,author,createdTime,modifiedTime"
-            ).execute()
-        reply = await asyncio.to_thread(_reply)
-        logger.info(f"Posted reply to comment {comment_id} in document {document_id}")
-        return reply
-
     async def read_document(self, document_id: str) -> dict:
         """Retrieves the entire Google Doc as a JSON structure."""
         def _get_doc():
@@ -101,7 +72,7 @@ class GoogleDocsService:
     def extract_text(self, doc: dict) -> str:
         """
         Extracts and concatenates the plain text from the document's body content.
-        This walks through all the structural elements (typically paragraphs) and collects text.
+        Walks through the document's elements (typically paragraphs) and collects text.
         """
         content = doc.get('body', {}).get('content', [])
         paragraphs = []
@@ -119,10 +90,60 @@ class GoogleDocsService:
         doc = await self.read_document(document_id)
         return self.extract_text(doc)
 
+    async def rewrite_document(self, document_id: str, final_text: str) -> dict:
+        """
+        Rewrites the entire content of the document with the provided final text.
+        It deletes the existing content (if any) and then inserts the final text at the start.
+        """
+        # First, read the document to determine its current length.
+        doc = await self.read_document(document_id)
+        body_content = doc.get("body", {}).get("content", [])
+        # Get the end index from the last element, defaulting to 1 if not found.
+        end_index = body_content[-1].get("endIndex", 1) if body_content else 1
+
+        requests = []
+        # Only delete content if there's something to remove.
+        if end_index > 1 and (end_index - 1) > 1:
+            requests.append({
+                "deleteContentRange": {
+                    "range": {"startIndex": 1, "endIndex": end_index - 1}
+                }
+            })
+        # Insert the final text at index 1.
+        requests.append({
+            "insertText": {"location": {"index": 1}, "text": final_text}
+        })
+        result = await self.edit_document(document_id, requests)
+        return result
+
+    async def read_comments(self, document_id: str) -> list:
+        """Reads comments on the document using the Drive API."""
+        def _list_comments():
+            return self.drive_service.comments().list(
+                fileId=document_id,
+                fields="comments(id,content,author,createdTime,modifiedTime,replies(content,author,createdTime,modifiedTime))"
+            ).execute()
+        response = await asyncio.to_thread(_list_comments)
+        comments = response.get('comments', [])
+        logger.info(f"Retrieved {len(comments)} comments for document {document_id}")
+        return comments
+
+    async def reply_comment(self, document_id: str, comment_id: str, reply_content: str) -> dict:
+        """Replies to a specific comment on a document using the Drive API."""
+        def _reply():
+            body = {'content': reply_content}
+            return self.drive_service.replies().create(
+                fileId=document_id,
+                commentId=comment_id,
+                body=body,
+                fields="id,content,author,createdTime,modifiedTime"
+            ).execute()
+        reply = await asyncio.to_thread(_reply)
+        logger.info(f"Posted reply to comment {comment_id} in document {document_id}")
+        return reply
+
     async def create_comment(self, document_id: str, content: str) -> dict:
-        """
-        Creates a comment on the document.
-        """
+        """Creates a comment on the document."""
         def _create_comment():
             body = {"content": content}
             return self.drive_service.comments().create(

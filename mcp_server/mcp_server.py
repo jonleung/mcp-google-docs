@@ -1,17 +1,15 @@
-# File: mcp_server/mcp_server.py
-
 import os
 import argparse
 import asyncio
 import dotenv
 
-# Import MCP server utilities
+# Import MCP server utilities.
 from mcp.server import Server, NotificationOptions
 from mcp.server.models import InitializationOptions
 import mcp.types as types
 import mcp.server.stdio
 
-# Import your service implementation
+# Import our updated GoogleDocsService.
 from mcp_server.google_docs_service import GoogleDocsService
 
 dotenv.load_dotenv()
@@ -28,7 +26,6 @@ async def run_main(creds_file_path: str, token_path: str):
     @server.list_tools()
     async def handle_list_tools() -> list[types.Tool]:
         return [
-            # Tool: create-doc remains unchanged.
             types.Tool(
                 name="create-doc",
                 description="Creates a new Google Doc with an optional title",
@@ -45,10 +42,9 @@ async def run_main(creds_file_path: str, token_path: str):
                     "required": []
                 }
             ),
-            # New tool: insert-text
             types.Tool(
-                name="insert-text",
-                description="Inserts text into a Google Doc at a specified index",
+                name="rewrite-document",
+                description="Rewrites the entire content of a Google Doc with the provided final text",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -57,76 +53,13 @@ async def run_main(creds_file_path: str, token_path: str):
                             "description": "The ID of the Google Document",
                             "example": "1abcXYZ..."
                         },
-                        "index": {
-                            "type": "number",
-                            "description": "The insertion index (1-based)",
-                            "example": 1
-                        },
-                        "text": {
+                        "final_text": {
                             "type": "string",
-                            "description": "The text to insert",
-                            "example": "Hello World\n"
+                            "description": "The final text to replace the document's content",
+                            "example": "This is the new content of the document."
                         }
                     },
-                    "required": ["document_id", "index", "text"]
-                }
-            ),
-            # New tool: replace-text
-            types.Tool(
-                name="replace-text",
-                description="Replaces all occurrences of a search string with a replacement string in a Google Doc",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "document_id": {
-                            "type": "string",
-                            "description": "The ID of the Google Document",
-                            "example": "1abcXYZ..."
-                        },
-                        "search_text": {
-                            "type": "string",
-                            "description": "The text to search for",
-                            "example": "FOO"
-                        },
-                        "replace_text": {
-                            "type": "string",
-                            "description": "The text to replace with",
-                            "example": "BAR"
-                        },
-                        "match_case": {
-                            "type": "boolean",
-                            "description": "Whether the search should be case sensitive",
-                            "default": False,
-                            "example": False
-                        }
-                    },
-                    "required": ["document_id", "search_text", "replace_text"]
-                }
-            ),
-            # New tool: delete-content
-            types.Tool(
-                name="delete-content",
-                description="Deletes the content in a specified range in a Google Doc",
-                inputSchema={
-                    "type": "object",
-                    "properties": {
-                        "document_id": {
-                            "type": "string",
-                            "description": "The ID of the Google Document",
-                            "example": "1abcXYZ..."
-                        },
-                        "start_index": {
-                            "type": "number",
-                            "description": "The starting index of the content range (inclusive)",
-                            "example": 10
-                        },
-                        "end_index": {
-                            "type": "number",
-                            "description": "The ending index of the content range (exclusive)",
-                            "example": 20
-                        }
-                    },
-                    "required": ["document_id", "start_index", "end_index"]
+                    "required": ["document_id", "final_text"]
                 }
             ),
             types.Tool(
@@ -186,8 +119,7 @@ async def run_main(creds_file_path: str, token_path: str):
             ),
             types.Tool(
                 name="create-comment",
-                description="Creates a new anchored comment on a Google Doc. "
-                            "You must specify the document ID and the comment content.",
+                description="Creates a new anchored comment on a Google Doc.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -200,7 +132,7 @@ async def run_main(creds_file_path: str, token_path: str):
                             "type": "string",
                             "description": "The text content of the comment",
                             "example": "This is an anchored comment."
-                        },
+                        }
                     },
                     "required": ["document_id", "content"]
                 }
@@ -230,7 +162,6 @@ async def run_main(creds_file_path: str, token_path: str):
                     "required": ["document_id", "comment_id", "reply_id"]
                 }
             ),
-
         ]
 
     @server.call_tool()
@@ -242,38 +173,14 @@ async def run_main(creds_file_path: str, token_path: str):
                 type="text",
                 text=f"Document created at URL: https://docs.google.com/document/d/{doc.get('documentId')}/edit"
             )]
-        elif name == "insert-text":
+        elif name == "rewrite-document":
             document_id = arguments["document_id"]
-            index = arguments["index"]
-            text_to_insert = arguments["text"]
-            # Build an insertText request.
-            request = [{"insertText": {"location": {"index": index}, "text": text_to_insert}}]
-            result = await docs_service.edit_document(document_id, request)
-            return [types.TextContent(type="text", text=f"Inserted text into document {document_id}.")]
-        elif name == "replace-text":
-            document_id = arguments["document_id"]
-            search_text = arguments["search_text"]
-            replace_text = arguments["replace_text"]
-            match_case = arguments.get("match_case", False)
-            request = [{
-                "replaceAllText": {
-                    "containsText": {"text": search_text, "matchCase": match_case},
-                    "replaceText": replace_text
-                }
-            }]
-            result = await docs_service.edit_document(document_id, request)
-            return [types.TextContent(type="text", text=f"Replaced text in document {document_id}: {result}")]
-        elif name == "delete-content":
-            document_id = arguments["document_id"]
-            start_index = arguments["start_index"]
-            end_index = arguments["end_index"]
-            request = [{
-                "deleteContentRange": {
-                    "range": {"startIndex": start_index, "endIndex": end_index}
-                }
-            }]
-            result = await docs_service.edit_document(document_id, request)
-            return [types.TextContent(type="text", text=f"Deleted content from document {document_id}: {result}")]
+            final_text = arguments["final_text"]
+            result = await docs_service.rewrite_document(document_id, final_text)
+            return [types.TextContent(
+                type="text",
+                text=f"Document {document_id} rewritten with new content. Result: {result}"
+            )]
         elif name == "read-comments":
             document_id = arguments["document_id"]
             comments = await docs_service.read_comments(document_id)
@@ -321,9 +228,8 @@ async def run_main(creds_file_path: str, token_path: str):
 
 def main():
     """
-    Entry point for the MCP server. This function parses command-line arguments
-    (or falls back to environment variables) for the credentials and token file paths,
-    then calls the async run_main() function.
+    Entry point for the MCP server. Parses command-line arguments (or falls back to environment variables)
+    for the credentials and token file paths, then calls the async run_main() function.
     """
     parser = argparse.ArgumentParser(description='Google Docs API MCP Server')
     parser.add_argument(

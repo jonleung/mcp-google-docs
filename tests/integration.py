@@ -151,3 +151,44 @@ async def test_create_comment(temp_document, docs_service):
     content = "Test create comment"
     comment = await docs_service.create_comment(document_id, content)
     assert "id" in comment, "Comment should have an id"
+
+@pytest.mark.asyncio
+async def test_delete_reply(temp_document, docs_service):
+    document_id = temp_document
+
+    # Step 1: Create a comment to which we will add a reply.
+    def create_comment():
+        body = {"content": "Test comment for delete reply"}
+        return docs_service.drive_service.comments().create(
+            fileId=document_id,
+            body=body,
+            fields="id,content,replies"
+        ).execute()
+    comment = await asyncio.to_thread(create_comment)
+    comment_id = comment.get("id")
+    assert comment_id, "A comment should have been created for delete reply test."
+
+    # Step 2: Create a reply for the comment.
+    reply_text = "Test reply to be deleted"
+    reply = await docs_service.reply_comment(document_id, comment_id, reply_text)
+    reply_id = reply.get("id")
+    assert reply_id, "A reply should have been created for delete reply test."
+
+    # Step 3: Delete the reply using the new delete_reply method.
+    await docs_service.delete_reply(document_id, comment_id, reply_id)
+
+    # Step 4: Verify the reply was deleted by reading the comment's replies.
+    comments = await docs_service.read_comments(document_id)
+    for c in comments:
+        if c.get("id") == comment_id:
+            replies = c.get("replies", [])
+            # If there are replies, ensure none match the deleted reply_id.
+            assert all(r.get("id") != reply_id for r in replies), "The reply should have been deleted."
+
+    # Clean up: Delete the comment.
+    def delete_comment():
+        return docs_service.drive_service.comments().delete(
+            fileId=document_id,
+            commentId=comment_id
+        ).execute()
+    await asyncio.to_thread(delete_comment)

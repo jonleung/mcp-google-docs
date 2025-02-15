@@ -205,6 +205,32 @@ async def run_main(creds_file_path: str, token_path: str):
                     "required": ["document_id", "content"]
                 }
             ),
+            types.Tool(
+                name="delete-reply",
+                description="Deletes a reply from a comment in a Google Doc",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "document_id": {
+                            "type": "string",
+                            "description": "The ID of the Google Document",
+                            "example": "1abcXYZ..."
+                        },
+                        "comment_id": {
+                            "type": "string",
+                            "description": "The ID of the comment containing the reply",
+                            "example": "Cp1..."
+                        },
+                        "reply_id": {
+                            "type": "string",
+                            "description": "The ID of the reply to delete",
+                            "example": "reply123"
+                        }
+                    },
+                    "required": ["document_id", "comment_id", "reply_id"]
+                }
+            ),
+
         ]
 
     @server.call_tool()
@@ -267,6 +293,15 @@ async def run_main(creds_file_path: str, token_path: str):
             content = arguments["content"]
             comment = await docs_service.create_comment(document_id, content)
             return [types.TextContent(type="text", text=f"Comment created: {comment}")]
+        elif name == "delete-reply":
+            document_id = arguments["document_id"]
+            comment_id = arguments["comment_id"]
+            reply_id = arguments["reply_id"]
+            await docs_service.delete_reply(document_id, comment_id, reply_id)
+            return [types.TextContent(
+                type="text",
+                text=f"Deleted reply {reply_id} from comment {comment_id} in document {document_id}."
+            )]
         else:
             raise ValueError(f"Unknown tool: {name}")
 

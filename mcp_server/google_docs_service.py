@@ -68,7 +68,7 @@ class GoogleDocsService:
             # Request only supported fields (replyCount removed).
             return self.drive_service.comments().list(
                 fileId=document_id,
-                fields="comments(id,content,author,createdTime,modifiedTime)"
+                fields="comments(id,content,author,createdTime,modifiedTime,replies(content,author,createdTime,modifiedTime))"
             ).execute()
         response = await asyncio.to_thread(_list_comments)
         comments = response.get('comments', [])
@@ -133,3 +133,15 @@ class GoogleDocsService:
         comment = await asyncio.to_thread(_create_comment)
         logger.info(f"Created comment with ID: {comment.get('id')}")
         return comment
+
+    async def delete_reply(self, document_id: str, comment_id: str, reply_id: str) -> dict:
+        """Deletes a reply to a comment in a document using the Drive API."""
+        def _delete_reply():
+            return self.drive_service.replies().delete(
+                fileId=document_id,
+                commentId=comment_id,
+                replyId=reply_id
+            ).execute()
+        result = await asyncio.to_thread(_delete_reply)
+        logger.info(f"Deleted reply {reply_id} for comment {comment_id} in document {document_id}")
+        return result

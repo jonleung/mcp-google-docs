@@ -121,7 +121,7 @@ class GoogleDocsService:
         def _list_comments():
             return self.drive_service.comments().list(
                 fileId=document_id,
-                fields="comments(id,content,author,createdTime,modifiedTime,status,replies(content,author,id,createdTime,modifiedTime))"
+                fields="comments(id,content,author,createdTime,modifiedTime,resolved,replies(content,author,id,createdTime,modifiedTime))"
             ).execute()
         response = await asyncio.to_thread(_list_comments)
         comments = response.get('comments', [])

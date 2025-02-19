@@ -21,7 +21,7 @@ class GoogleDocsService:
         self.creds = self._get_credentials(creds_file_path, token_path, scopes)
         # Initialize the Docs API client.
         self.docs_service = build('docs', 'v1', credentials=self.creds)
-        # Initialize the Drive API client (for comments and replies).
+        # Initialize the Drive API client (for sharing, comments, etc).
         self.drive_service = build('drive', 'v3', credentials=self.creds)
         logger.info("Google Docs and Drive services initialized.")
 
@@ -43,14 +43,49 @@ class GoogleDocsService:
                 logger.info(f'Token saved to {token_path}')
         return creds
 
-    async def create_document(self, title: str = "New Document") -> dict:
-        """Creates a new Google Doc with the given title."""
+    async def create_document(self, title: str = "New Document", org: str = None, role: str = "writer") -> dict:
+        """
+        Creates a new Google Doc with the given title.
+        If 'org' is provided (e.g., "example.com"), the document will be shared with everyone in that domain,
+        using the specified role (default is "writer").
+        """
         def _create():
             body = {'title': title}
             return self.docs_service.documents().create(body=body).execute()
         doc = await asyncio.to_thread(_create)
-        logger.info(f"Created document with ID: {doc.get('documentId')}")
+        document_id = doc.get('documentId')
+        logger.info(f"Created document with ID: {document_id}")
+
+        if org and document_id:
+            await self.share_document_with_org(document_id, org, role)
         return doc
+
+    async def share_document_with_org(self, document_id: str, domain: str, role: str = "writer") -> dict:
+        """
+        Shares the document with everyone in the specified domain.
+
+        Args:
+            document_id (str): The ID of the document to share.
+            domain (str): Your organization's domain (e.g., "example.com").
+            role (str): The access level to grant ("writer" for editing, "reader" for viewing).
+
+        Returns:
+            dict: The response from the Drive API.
+        """
+        def _share():
+            permission_body = {
+                'type': 'domain',
+                'role': role,
+                'domain': domain
+            }
+            return self.drive_service.permissions().create(
+                fileId=document_id,
+                body=permission_body,
+                fields='id'
+            ).execute()
+        result = await asyncio.to_thread(_share)
+        logger.info(f"Shared document {document_id} with organization domain: {domain}")
+        return result
 
     async def edit_document(self, document_id: str, requests: list) -> dict:
         """Edits a document using a batchUpdate request."""

@@ -65,6 +65,35 @@ async def test_create_document(docs_service):
         lambda: docs_service.drive_service.files().delete(fileId=document_id).execute()
     )
 
+# Test: Create a document and share with datastax.com
+@pytest.mark.asyncio
+async def test_create_document_with_org(docs_service):
+    title = f"Integration Create Doc with Org Test {int(time.time())}"
+    org = "datastax.com"
+    # Create the document with org share enabled.
+    doc = await docs_service.create_document(title, org, "writer")
+    document_id = doc.get("documentId")
+    assert document_id, "Document ID should be returned on creation with org sharing."
+    # Give the permission a moment to propagate.
+    await asyncio.sleep(1)
+    # Retrieve the document's permissions.
+    permissions = await asyncio.to_thread(
+        lambda: docs_service.drive_service.permissions().list(
+            fileId=document_id,
+            fields="permissions(id, domain, role, type)"
+        ).execute()
+    )
+    # Look for a domain-level permission for datastax.com.
+    domain_perms = [
+        perm for perm in permissions.get("permissions", [])
+        if perm.get("type") == "domain" and perm.get("domain") == org
+    ]
+    assert domain_perms, f"Document should have domain permission for {org}."
+    # Clean up.
+    await asyncio.to_thread(
+        lambda: docs_service.drive_service.files().delete(fileId=document_id).execute()
+    )
+
 # Test: Rewrite the document content.
 @pytest.mark.asyncio
 async def test_rewrite_document(temp_document, docs_service):

@@ -28,7 +28,7 @@ async def run_main(creds_file_path: str, token_path: str):
         return [
             types.Tool(
                 name="create-doc",
-                description="Creates a new Google Doc with an optional title",
+                description="Creates a new Google Doc with an optional title. Optionally, share with your organization by providing a domain and role.",
                 inputSchema={
                     "type": "object",
                     "properties": {
@@ -37,6 +37,17 @@ async def run_main(creds_file_path: str, token_path: str):
                             "description": "Title of the new document",
                             "default": "New Document",
                             "example": "My New Document"
+                        },
+                        "org": {
+                            "type": "string",
+                            "description": "Organization domain to share the document with (e.g., 'example.com')",
+                            "example": "example.com"
+                        },
+                        "role": {
+                            "type": "string",
+                            "description": "Permission role to assign (e.g., 'writer' or 'reader')",
+                            "default": "writer",
+                            "example": "writer"
                         }
                     },
                     "required": []
@@ -168,7 +179,10 @@ async def run_main(creds_file_path: str, token_path: str):
     async def handle_call_tool(name: str, arguments: dict | None) -> list[types.TextContent]:
         if name == "create-doc":
             title = arguments.get("title", "New Document")
-            doc = await docs_service.create_document(title)
+            # Retrieve optional parameters for org and role.
+            org = arguments.get("org")
+            role = arguments.get("role", "writer")
+            doc = await docs_service.create_document(title, org, role)
             return [types.TextContent(
                 type="text",
                 text=f"Document created at URL: https://docs.google.com/document/d/{doc.get('documentId')}/edit"

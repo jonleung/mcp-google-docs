@@ -107,7 +107,8 @@ class GoogleDocsService:
     def extract_text(self, doc: dict) -> str:
         """
         Extracts and concatenates the plain text from the document's body content.
-        Walks through the document's elements (typically paragraphs) and collects text.
+        This version strips trailing newline characters from each paragraph so that
+        the resulting text matches the inserted content more precisely.
         """
         content = doc.get('body', {}).get('content', [])
         paragraphs = []
@@ -117,8 +118,10 @@ class GoogleDocsService:
                 for elem in element['paragraph'].get('elements', []):
                     if 'textRun' in elem:
                         para += elem['textRun'].get('content', '')
-                paragraphs.append(para)
-        return "\n".join(paragraphs)
+                # Remove any trailing newlines from the paragraph.
+                paragraphs.append(para.rstrip("\n"))
+        # Join paragraphs with a single newline and strip any trailing newline at the end.
+        return "\n".join(paragraphs).rstrip("\n")
 
     async def read_document_text(self, document_id: str) -> str:
         """Convenience method to get the document text."""

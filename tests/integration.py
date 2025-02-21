@@ -216,3 +216,42 @@ async def test_delete_reply(temp_document, docs_service):
             commentId=comment_id
         ).execute()
     await asyncio.to_thread(delete_comment)
+
+
+@pytest.mark.asyncio
+async def test_write_and_read_doc():
+    """
+    Integration test for creating a Google Doc, rewriting its content,
+    and reading back the text to confirm the update.
+    """
+    creds_file_path = os.environ.get("GOOGLE_CREDS_FILE")
+    token_file = os.environ.get("GOOGLE_TOKEN_FILE")
+
+    # Skip test if credentials are not set.
+    if not creds_file_path or not token_file:
+        pytest.skip("Environment variables GOOGLE_CREDS_FILE and GOOGLE_TOKEN_FILE must be set for integration tests.")
+
+    # Instantiate the GoogleDocsService.
+    service = GoogleDocsService(creds_file_path, token_file)
+
+    # Create a new document with a test title.
+    doc = await service.create_document(title="Integration Test Document")
+    document_id = doc.get("documentId")
+    assert document_id, "Document creation failed; no documentId returned."
+
+    # Define the test content.
+    test_content = "Hello, this is an integration test \nfor rewriting and reading a Google Doc!"
+
+    # Rewrite the document with the test content.
+    rewrite_result = await service.rewrite_document(document_id, test_content)
+
+    # Read the document's text back.
+    read_back_text = await service.read_document_text(document_id)
+
+    # Verify that the new content appears in the document.
+    assert test_content in read_back_text, (
+        f"Expected content not found in document. Read content: {read_back_text}"
+    )
+
+    # Optionally, print the document URL for manual inspection.
+    print(f"Test document URL: https://docs.google.com/document/d/{document_id}/edit")

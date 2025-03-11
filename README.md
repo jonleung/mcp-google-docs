@@ -1,3 +1,5 @@
+> Note that this README was AI generated and I asked it to bias it on making it "idiot proof". I have not reviewed it yet lol
+
 # Google Docs MCP Server
 
 This Model Context Protocol (MCP) server provides Claude with the ability to interact with Google Docs directly. With this integration, Claude can create, read, and edit Google Documents, as well as work with comments.
